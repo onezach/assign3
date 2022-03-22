@@ -173,7 +173,7 @@ public class Router extends Device
 
 			ICMP test = (ICMP) ether.getPayload().getPayload();
 			System.out.println("code: " + test.getIcmpCode() + ", type: " + test.getIcmpType());
-			System.out.println(test.getPayload());
+			System.out.println(((Data) test.getPayload()).toString());
 
 			return; 
 		}
