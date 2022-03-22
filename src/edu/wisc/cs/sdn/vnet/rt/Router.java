@@ -167,7 +167,7 @@ public class Router extends Device
 			}
 
 			data.setData(icmpPayload);
-			icmp.setPayload(data);
+			// icmp.setPayload(data);
 			
 			this.sendPacket(ether, inIface);
 
