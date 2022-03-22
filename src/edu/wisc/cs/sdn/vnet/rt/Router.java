@@ -120,6 +120,7 @@ public class Router extends Device
 
 		// Check TTL
 		ipPacket.setTtl((byte)(ipPacket.getTtl()-1));
+		System.out.println("TTL --> " + ipPacket.getTtl());
 		if (0 == ipPacket.getTtl())
 		{ 
 			Ethernet ether = new Ethernet();
