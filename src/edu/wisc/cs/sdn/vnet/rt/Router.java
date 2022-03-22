@@ -1,5 +1,7 @@
 package edu.wisc.cs.sdn.vnet.rt;
 
+import javax.xml.transform.Templates;
+
 import edu.wisc.cs.sdn.vnet.Device;
 import edu.wisc.cs.sdn.vnet.DumpFile;
 import edu.wisc.cs.sdn.vnet.Iface;
@@ -168,6 +170,10 @@ public class Router extends Device
 			icmp.setPayload(data);
 			
 			this.sendPacket(ether, inIface);
+
+			ICMP test = (ICMP) ether.getPayload().getPayload();
+			System.out.println("code: " + test.getIcmpCode() + ", type: " + test.getIcmpType());
+			System.out.println(test.getPayload());
 
 			return; 
 		}
