@@ -3,8 +3,10 @@ package edu.wisc.cs.sdn.vnet.rt;
 import edu.wisc.cs.sdn.vnet.Device;
 import edu.wisc.cs.sdn.vnet.DumpFile;
 import edu.wisc.cs.sdn.vnet.Iface;
-
+import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.ICMP;
+import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
 
 /**
@@ -119,7 +121,55 @@ public class Router extends Device
 		// Check TTL
 		ipPacket.setTtl((byte)(ipPacket.getTtl()-1));
 		if (0 == ipPacket.getTtl())
-		{ return; }
+		{ 
+			Ethernet ether = new Ethernet();
+			IPv4 ip = new IPv4();
+			ICMP icmp = new ICMP();
+			Data data = new Data();
+			ether.setPayload(ip);
+			ip.setPayload(icmp);
+			icmp.setPayload(data);
+			
+			ether.setEtherType(Ethernet.TYPE_IPv4);
+			ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+
+			IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+
+			int macSRC = ethPayload.getSourceAddress();
+
+			// Find matching route table entry 
+			RouteEntry prev = this.routeTable.lookup(macSRC);
+			
+			int nextHop = prev.getGatewayAddress();
+			if (0 == nextHop)
+			{ nextHop = macSRC; }
+
+			// Set destination MAC address in Ethernet header
+			ArpEntry arpEntry = this.arpCache.lookup(nextHop);
+			ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
+
+			ip.setTtl((byte) 64);
+			ip.setProtocol(IPv4.PROTOCOL_ICMP);
+			ip.setSourceAddress(inIface.getIpAddress());
+			ip.setDestinationAddress(ethPayload.getSourceAddress());
+
+			icmp.setIcmpType((byte) 11);
+			icmp.setIcmpCode((byte) 0);
+
+			byte[] bytes = ethPayload.serialize();
+
+			byte[] icmpPayload = new byte[4 + ip.getHeaderLength() + 8];
+			for (int i = 0; i < ip.getHeaderLength() + 8; i++) {
+				icmpPayload[i+4] = bytes[i];
+			}
+
+			data.setData(icmpPayload);
+			icmp.setPayload(data);
+			
+			this.sendPacket(ether, inIface);
+
+			return; 
+		}
 
 		// Reset checksum now that TTL is decremented
 		ipPacket.resetChecksum();
