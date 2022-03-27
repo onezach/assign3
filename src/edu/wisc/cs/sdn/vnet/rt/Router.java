@@ -2,17 +2,14 @@ package edu.wisc.cs.sdn.vnet.rt;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import javax.xml.transform.Templates;
 
 import edu.wisc.cs.sdn.vnet.Device;
 import edu.wisc.cs.sdn.vnet.DumpFile;
 import edu.wisc.cs.sdn.vnet.Iface;
+
 import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
-import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
 
 /**
@@ -126,7 +123,6 @@ public class Router extends Device
 
 		// Check TTL
 		ipPacket.setTtl((byte)(ipPacket.getTtl()-1));
-		System.out.println("TTL --> " + ipPacket.getTtl());
 		if (0 == ipPacket.getTtl())
 		{ 
 			// set up pack headers
@@ -157,7 +153,6 @@ public class Router extends Device
 			ArpEntry arpEntry = this.arpCache.lookup(nextHop);
 			ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
 
-
 			// set IP header fields
 			ip.setTtl((byte) 64);
 			ip.setProtocol(IPv4.PROTOCOL_ICMP);
@@ -168,6 +163,7 @@ public class Router extends Device
 			icmp.setIcmpType((byte) 11);
 			icmp.setIcmpCode((byte) 0);
 
+			// extract etherPacket payload and format into ICMP payload
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			byte[] padding = new byte[4];
 			try {
@@ -175,10 +171,10 @@ public class Router extends Device
 				baos.write(ethPayload.serialize());
 			} catch (IOException e) {
 				e.printStackTrace();
-			} // test123
+			}
 
+			// convert to proper size and set data
 			byte[] fullPayload = baos.toByteArray();
-
 			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
 			for (int i = 0; i < partialPayload.length; i++) {
 				partialPayload[i] = fullPayload[i];
@@ -186,11 +182,6 @@ public class Router extends Device
 			data.setData(partialPayload);
 			
 			this.sendPacket(ether, inIface);
-
-			ICMP test = (ICMP) ether.getPayload().getPayload();
-			System.out.println("code: " + test.getIcmpCode() + ", type: " + test.getIcmpType());
-			System.out.println(((Data) test.getPayload()).toString());
-
 			return; 
 		}
 
@@ -210,7 +201,6 @@ public class Router extends Device
 
 	private void forwardIpPacket(Ethernet etherPacket, Iface inIface)
 	{
-		//comment
 		// Make sure it's an IP packet
 		if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
 		{ return; }
@@ -225,7 +215,66 @@ public class Router extends Device
 
 		// If no entry matched, do nothing
 		if (null == bestMatch)
-		{ return; }
+		{ 
+			// set up pack headers
+			Ethernet ether = new Ethernet();
+			IPv4 ip = new IPv4();
+			ICMP icmp = new ICMP();
+			Data data = new Data();
+			ether.setPayload(ip);
+			ip.setPayload(icmp);
+			icmp.setPayload(data);
+
+			// set ether packet header fields
+			ether.setEtherType(Ethernet.TYPE_IPv4);
+			ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+
+			IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+
+			int macSRC = ethPayload.getSourceAddress();
+
+			// Find matching route table entry 
+			RouteEntry prev = this.routeTable.lookup(macSRC);
+
+			int nextHop = prev.getGatewayAddress();
+			if (0 == nextHop)
+			{ nextHop = macSRC; }
+
+			// Set destination MAC address in Ethernet header
+			ArpEntry arpEntry = this.arpCache.lookup(nextHop);
+			ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
+
+			// set IP header fields
+			ip.setTtl((byte) 64);
+			ip.setProtocol(IPv4.PROTOCOL_ICMP);
+			ip.setSourceAddress(inIface.getIpAddress());
+			ip.setDestinationAddress(ethPayload.getSourceAddress());
+
+			// set ICMP header fields
+			icmp.setIcmpType((byte) 3);
+			icmp.setIcmpCode((byte) 0);
+
+			// extract etherPacket payload and format into ICMP payload
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] padding = new byte[4];
+			try {
+				baos.write(padding);
+				baos.write(ethPayload.serialize());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
+			// convert to proper size and set data
+			byte[] fullPayload = baos.toByteArray();
+			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
+			for (int i = 0; i < partialPayload.length; i++) {
+				partialPayload[i] = fullPayload[i];
+			}
+			data.setData(partialPayload);
+
+			this.sendPacket(ether, inIface);
+			return;
+		}
 
 		// Make sure we don't sent a packet back out the interface it came in
 		Iface outIface = bestMatch.getInterface();
