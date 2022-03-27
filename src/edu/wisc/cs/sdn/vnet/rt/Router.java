@@ -284,6 +284,8 @@ public class Router extends Device
 		Iface outIface = bestMatch.getInterface();
 		if (outIface == inIface)
 		{ 
+			System.out.println("Match");
+			System.out.println("etherType: " + etherPacket.getEtherType() + ", U/T: " + IPv4.PROTOCOL_UDP + " " + IPv4.PROTOCOL_TCP);
 			if (etherPacket.getEtherType() == IPv4.PROTOCOL_UDP || etherPacket.getEtherType() == IPv4.PROTOCOL_TCP) {
 				// set up pack headers
 				Ethernet ether = new Ethernet();
@@ -320,7 +322,7 @@ public class Router extends Device
 				ip.setDestinationAddress(ethPayload.getSourceAddress());
 
 				// set ICMP header fields
-				icmp.setIcmpType((byte) 3);
+				icmp.setIcmpType((byte) 11);
 				icmp.setIcmpCode((byte) 3);
 
 				// extract etherPacket payload and format into ICMP payload
