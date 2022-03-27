@@ -175,11 +175,9 @@ public class Router extends Device
 				baos.write(ethPayload.serialize());
 			} catch (IOException e) {
 				e.printStackTrace();
-			}
+			} // test123
 
 			byte[] fullPayload = baos.toByteArray();
-
-			// System.out.println("regular header: " + ethPayload.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
 
 			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
 			for (int i = 0; i < partialPayload.length; i++) {
