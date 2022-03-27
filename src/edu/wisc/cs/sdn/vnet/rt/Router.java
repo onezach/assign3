@@ -78,6 +78,10 @@ public class Router extends Device
 		System.out.println("----------------------------------");
 	}
 
+	public void startRip() {
+		
+	}
+
 	/**
 	 * Handle an Ethernet packet received on a specific interface.
 	 * @param etherPacket the Ethernet packet that was received
