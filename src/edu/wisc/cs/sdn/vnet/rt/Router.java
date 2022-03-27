@@ -292,7 +292,67 @@ public class Router extends Device
 		// Set destination MAC address in Ethernet header
 		ArpEntry arpEntry = this.arpCache.lookup(nextHop);
 		if (null == arpEntry)
-		{ return; }
+		{ 
+			// set up pack headers
+			Ethernet ether = new Ethernet();
+			IPv4 ip = new IPv4();
+			ICMP icmp = new ICMP();
+			Data data = new Data();
+			ether.setPayload(ip);
+			ip.setPayload(icmp);
+			icmp.setPayload(data);
+
+			// set ether packet header fields
+			ether.setEtherType(Ethernet.TYPE_IPv4);
+			ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+
+			IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+
+			int macSRC = ethPayload.getSourceAddress();
+
+			// Find matching route table entry 
+			RouteEntry prev = this.routeTable.lookup(macSRC);
+
+			int nextHop1 = prev.getGatewayAddress();
+			if (0 == nextHop1)
+			{ nextHop1 = macSRC; }
+
+			// Set destination MAC address in Ethernet header
+			ArpEntry arpEntry1 = this.arpCache.lookup(nextHop1);
+			ether.setDestinationMACAddress(arpEntry1.getMac().toBytes());
+
+			// set IP header fields
+			ip.setTtl((byte) 64);
+			ip.setProtocol(IPv4.PROTOCOL_ICMP);
+			ip.setSourceAddress(inIface.getIpAddress());
+			ip.setDestinationAddress(ethPayload.getSourceAddress());
+
+			// set ICMP header fields
+			icmp.setIcmpType((byte) 3);
+			icmp.setIcmpCode((byte) 1);
+
+			// extract etherPacket payload and format into ICMP payload
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] padding = new byte[4];
+			try {
+				baos.write(padding);
+				baos.write(ethPayload.serialize());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
+			// convert to proper size and set data
+			byte[] fullPayload = baos.toByteArray();
+			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
+			for (int i = 0; i < partialPayload.length; i++) {
+				partialPayload[i] = fullPayload[i];
+			}
+			data.setData(partialPayload);
+
+			this.sendPacket(ether, inIface);
+			return; 
+		}
+
 		etherPacket.setDestinationMACAddress(arpEntry.getMac().toBytes());
 
 		this.sendPacket(etherPacket, outIface);
