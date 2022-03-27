@@ -318,7 +318,7 @@ public class Router extends Device
 				ip.setDestinationAddress(ethPayload.getSourceAddress());
 
 				// set ICMP header fields
-				icmp.setIcmpType((byte) 3);
+				icmp.setIcmpType((byte) 11);
 				icmp.setIcmpCode((byte) 3);
 
 				// extract etherPacket payload and format into ICMP payload
