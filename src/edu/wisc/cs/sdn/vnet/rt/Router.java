@@ -1,5 +1,9 @@
 package edu.wisc.cs.sdn.vnet.rt;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 import javax.xml.transform.Templates;
 
 import edu.wisc.cs.sdn.vnet.Device;
@@ -164,18 +168,24 @@ public class Router extends Device
 			icmp.setIcmpType((byte) 11);
 			icmp.setIcmpCode((byte) 0);
 
-
-			// set ICMP Payload
-			byte[] bytes = ethPayload.serialize();
-			
-			int icmpPayloadSize = 4 + (ip.getHeaderLength() * 4) + 8;
-			byte[] icmpPayload = new byte[icmpPayloadSize];
-			for (int i = 0; i < ip.getHeaderLength()*4 + 8; i++) {
-				icmpPayload[i+4] = bytes[i];
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] padding = new byte[4];
+			try {
+				baos.write(padding);
+				baos.write(ethPayload.serialize());
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 
-			data.setData(icmpPayload);
-			// icmp.setPayload(data);
+			byte[] fullPayload = baos.toByteArray();
+
+			// System.out.println("regular header: " + ethPayload.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
+
+			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
+			for (int i = 0; i < partialPayload.length; i++) {
+				partialPayload[i] = fullPayload[i];
+			}
+			data.setData(partialPayload);
 			
 			this.sendPacket(ether, inIface);
 
