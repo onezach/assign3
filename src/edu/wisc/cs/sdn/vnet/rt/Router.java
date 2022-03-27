@@ -201,7 +201,7 @@ public class Router extends Device
 				// System.out.println("etherType:" + etherPacket.getEtherType() + " U/T:" + IPv4.PROTOCOL_UDP + "/" + IPv4.PROTOCOL_TCP);
 				IPv4 ethPayload = (IPv4)etherPacket.getPayload();
 				if (ethPayload.getProtocol() == IPv4.PROTOCOL_UDP || ethPayload.getProtocol() == IPv4.PROTOCOL_TCP) {
-					
+
 					// set up pack headers
 					Ethernet ether = new Ethernet();
 					IPv4 ip = new IPv4();
@@ -237,7 +237,7 @@ public class Router extends Device
 					ip.setDestinationAddress(ethPayload.getSourceAddress());
 	
 					// set ICMP header fields
-					icmp.setIcmpType((byte) 11);
+					icmp.setIcmpType((byte) 3);
 					icmp.setIcmpCode((byte) 3);
 	
 					// extract etherPacket payload and format into ICMP payload
