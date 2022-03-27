@@ -168,10 +168,6 @@ public class Router extends Device
 			icmp.setIcmpType((byte) 11);
 			icmp.setIcmpCode((byte) 0);
 
-
-
-
-
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			byte[] padding = new byte[4];
 			try {
@@ -183,10 +179,9 @@ public class Router extends Device
 
 			byte[] fullPayload = baos.toByteArray();
 
-			System.out.println("regular header: " + ethPayload.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
+			// System.out.println("regular header: " + ethPayload.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
 
-
-			byte[] partialPayload = new byte[4 + (ip.getHeaderLength()*4) + 8];
+			byte[] partialPayload = new byte[4 + (ethPayload.getHeaderLength()*4) + 8];
 			for (int i = 0; i < partialPayload.length; i++) {
 				partialPayload[i] = fullPayload[i];
 			}
