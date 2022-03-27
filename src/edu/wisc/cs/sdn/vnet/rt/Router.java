@@ -202,6 +202,7 @@ public class Router extends Device
 
 	private void forwardIpPacket(Ethernet etherPacket, Iface inIface)
 	{
+		//comment
 		// Make sure it's an IP packet
 		if (etherPacket.getEtherType() != Ethernet.TYPE_IPv4)
 		{ return; }
