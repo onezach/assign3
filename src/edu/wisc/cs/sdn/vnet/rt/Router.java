@@ -192,15 +192,16 @@ public class Router extends Device
 		// Reset checksum now that TTL is decremented
 		ipPacket.resetChecksum();
 
-		System.out.println("Made it to interface check");
 		// Check if packet is destined for one of router's interfaces
 		for (Iface iface : this.interfaces.values())
 		{
 			if (ipPacket.getDestinationAddress() == iface.getIpAddress())
 			{ 
-				System.out.println("Match");
-				System.out.println("etherType:" + etherPacket.getEtherType() + " U/T:" + IPv4.PROTOCOL_UDP + "/" + IPv4.PROTOCOL_TCP);
-				if (etherPacket.getEtherType() == IPv4.PROTOCOL_UDP || etherPacket.getEtherType() == IPv4.PROTOCOL_TCP) {
+				// System.out.println("Match");
+				// System.out.println("etherType:" + etherPacket.getEtherType() + " U/T:" + IPv4.PROTOCOL_UDP + "/" + IPv4.PROTOCOL_TCP);
+				IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+				if (ethPayload.getProtocol() == IPv4.PROTOCOL_UDP || ethPayload.getProtocol() == IPv4.PROTOCOL_TCP) {
+					
 					// set up pack headers
 					Ethernet ether = new Ethernet();
 					IPv4 ip = new IPv4();
@@ -214,7 +215,7 @@ public class Router extends Device
 					ether.setEtherType(Ethernet.TYPE_IPv4);
 					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
 	
-					IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+					// IPv4 ethPayload = (IPv4)etherPacket.getPayload();
 	
 					int macSRC = ethPayload.getSourceAddress();
 	
@@ -262,7 +263,7 @@ public class Router extends Device
 				} 
 	
 				// echo reply
-				else if (etherPacket.getEtherType() == IPv4.PROTOCOL_ICMP) {
+				else if (ethPayload.getProtocol() == IPv4.PROTOCOL_ICMP) {
 	
 					// set up pack headers
 					Ethernet ether = new Ethernet();
@@ -277,7 +278,7 @@ public class Router extends Device
 					ether.setEtherType(Ethernet.TYPE_IPv4);
 					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
 	
-					IPv4 ethPayload = (IPv4)etherPacket.getPayload();
+					// IPv4 ethPayload = (IPv4)etherPacket.getPayload();
 	
 					int macSRC = ethPayload.getSourceAddress();
 	
