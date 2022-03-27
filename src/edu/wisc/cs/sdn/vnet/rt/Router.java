@@ -183,7 +183,7 @@ public class Router extends Device
 
 			byte[] fullPayload = baos.toByteArray();
 
-			System.out.println("regular header: " + ip.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
+			System.out.println("regular header: " + ethPayload.getHeaderLength() + "casted to int: " + (int)ip.getHeaderLength());
 
 
 			byte[] partialPayload = new byte[4 + (ip.getHeaderLength()*4) + 8];
