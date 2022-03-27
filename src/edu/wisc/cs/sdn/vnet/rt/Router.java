@@ -280,8 +280,11 @@ public class Router extends Device
 			return;
 		}
 
+		System.out.println("Outside");
+		
 		// Make sure we don't sent a packet back out the interface it came in
 		Iface outIface = bestMatch.getInterface();
+		System.out.println("out:" + outIface + " in:" + inIface);
 		if (outIface == inIface)
 		{ 
 			System.out.println("Match");
