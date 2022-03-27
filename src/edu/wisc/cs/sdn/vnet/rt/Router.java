@@ -192,11 +192,14 @@ public class Router extends Device
 		// Reset checksum now that TTL is decremented
 		ipPacket.resetChecksum();
 
+		System.out.println("Made it to interface check");
 		// Check if packet is destined for one of router's interfaces
 		for (Iface iface : this.interfaces.values())
 		{
 			if (ipPacket.getDestinationAddress() == iface.getIpAddress())
 			{ 
+				System.out.println("Match");
+				System.out.println("etherType:" + etherPacket.getEtherType() + " U/T:" + IPv4.PROTOCOL_UDP + "/" + IPv4.PROTOCOL_TCP);
 				if (etherPacket.getEtherType() == IPv4.PROTOCOL_UDP || etherPacket.getEtherType() == IPv4.PROTOCOL_TCP) {
 					// set up pack headers
 					Ethernet ether = new Ethernet();
