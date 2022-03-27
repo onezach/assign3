@@ -125,6 +125,7 @@ public class Router extends Device
 		System.out.println("TTL --> " + ipPacket.getTtl());
 		if (0 == ipPacket.getTtl())
 		{ 
+			// set up pack headers
 			Ethernet ether = new Ethernet();
 			IPv4 ip = new IPv4();
 			ICMP icmp = new ICMP();
@@ -133,6 +134,7 @@ public class Router extends Device
 			ip.setPayload(icmp);
 			icmp.setPayload(data);
 			
+			// set ether packet header fields
 			ether.setEtherType(Ethernet.TYPE_IPv4);
 			ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
 
@@ -151,18 +153,24 @@ public class Router extends Device
 			ArpEntry arpEntry = this.arpCache.lookup(nextHop);
 			ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
 
+
+			// set IP header fields
 			ip.setTtl((byte) 64);
 			ip.setProtocol(IPv4.PROTOCOL_ICMP);
 			ip.setSourceAddress(inIface.getIpAddress());
 			ip.setDestinationAddress(ethPayload.getSourceAddress());
 
+			// set ICMP header fields
 			icmp.setIcmpType((byte) 11);
 			icmp.setIcmpCode((byte) 0);
 
-			byte[] bytes = ethPayload.serialize();
 
-			byte[] icmpPayload = new byte[4 + ip.getHeaderLength() + 8];
-			for (int i = 0; i < ip.getHeaderLength() + 8; i++) {
+			// set ICMP Payload
+			byte[] bytes = ethPayload.serialize();
+			
+			int icmpPayloadSize = 4 + (ip.getHeaderLength() * 4) + 8;
+			byte[] icmpPayload = new byte[icmpPayloadSize];
+			for (int i = 0; i < ip.getHeaderLength()*4 + 8; i++) {
 				icmpPayload[i+4] = bytes[i];
 			}
 
