@@ -471,7 +471,8 @@ public class Router extends Device implements Runnable
 								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
 									// update current rip table and routing table
 									ripTable.remove(currentRipEntry);
-									ripTable.put(potentiallyBetterRIPEntry, System.currentTimeMillis());
+									RIPv2Entry newRip = new RIPv2Entry(potentiallyBetterRIPEntry.getAddress(), potentiallyBetterRIPEntry.getSubnetMask(), potentiallyBetterRIPEntry.getMetric() + 1);
+									ripTable.put(newRip, System.currentTimeMillis());
 
 									routeTable.remove(currentRipEntry.getAddress(), currentRipEntry.getSubnetMask());
 									routeTable.insert(currentRipEntry.getAddress(), ipPacket.getSourceAddress(), currentRipEntry.getSubnetMask(), inIface);
