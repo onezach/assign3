@@ -93,6 +93,12 @@ public class Router extends Device implements Runnable
 		System.out.println("----------------------------------");
 	}
 
+	public void printRip(Map<RIPv2Entry, Long> ripTable) {
+		for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
+			System.out.println("address = " + entry.getKey().getAddress() + " subnet mask = " + entry.getKey().getSubnetMask() + " metric = " + entry.getKey().getMetric());
+		}
+	}
+
 	public void startRip() {
 
 		// initalize routeTable and ripTable
@@ -482,7 +488,8 @@ public class Router extends Device implements Runnable
 						}
 					}
 
-
+					System.out.println(routeTable);
+					printRip((ripTable));
 				}
 
 				return;
