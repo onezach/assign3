@@ -2,6 +2,9 @@ package edu.wisc.cs.sdn.vnet.rt;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 import edu.wisc.cs.sdn.vnet.Device;
 import edu.wisc.cs.sdn.vnet.DumpFile;
@@ -11,14 +14,23 @@ import net.floodlightcontroller.packet.Data;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.ICMP;
 import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.packet.RIPv2;
+import net.floodlightcontroller.packet.RIPv2Entry;
+import net.floodlightcontroller.packet.UDP;
 
 /**
  * @author Aaron Gember-Jacobson and Anubhavnidhi Abhashkumar
  */
-public class Router extends Device
+public class Router extends Device implements Runnable
 {	
 	/** Routing table for the router */
 	private RouteTable routeTable;
+
+	/** thread to send unsolicited response messages */
+	private Thread ripResponseSender;
+
+	/** RIP Table for the router */
+	private Map<RIPv2Entry, Long> ripTable;
 
 	/** ARP cache for the router */
 	private ArpCache arpCache;
@@ -31,7 +43,10 @@ public class Router extends Device
 	{
 		super(host,logfile);
 		this.routeTable = new RouteTable();
+		this.ripResponseSender = new Thread(this);
+		this.ripTable = new HashMap<RIPv2Entry, Long>();
 		this.arpCache = new ArpCache();
+
 	}
 
 	/**
@@ -79,8 +94,59 @@ public class Router extends Device
 	}
 
 	public void startRip() {
-		
+
+		// initalize routeTable and ripTable
+		for (Iface curIFace: interfaces.values()) {
+			// create router entry
+			int ip = curIFace.getIpAddress();
+			int mask = curIFace.getSubnetMask();
+			routeTable.insert(ip, 0, mask, curIFace);
+
+			// create ripTable entry
+			RIPv2Entry entry = new RIPv2Entry(ip, mask, 1);
+			ripTable.put(entry, System.currentTimeMillis());
+		}
+
+		// send out rip requests to all neighbors
+		for (Iface curIface: interfaces.values()) {
+			// create all packet headers
+			Ethernet ether = new Ethernet();
+			IPv4 ip = new IPv4();
+			UDP udp = new UDP();
+			RIPv2 ripPacket = new RIPv2();
+			
+			// set ether headers
+			byte[] broadcast = {(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF}; //DestMac set to all ones
+			ether.setDestinationMACAddress(broadcast);
+			ether.setSourceMACAddress(curIface.getMacAddress().toBytes());
+			ether.setEtherType(Ethernet.TYPE_IPv4);
+			ether.setPayload(ip);
+
+			// set ip headers
+			ip.setDestinationAddress(-536870903); //int version of 224.0.0.9 Special multi cast for RIP
+			ip.setSourceAddress(curIface.getIpAddress());
+			ip.setProtocol(IPv4.PROTOCOL_UDP);
+			ip.setTtl((byte)64);
+			ip.setPayload(udp);
+
+			//set udp headers
+			udp.setDestinationPort(UDP.RIP_PORT);
+			udp.setSourcePort(UDP.RIP_PORT);
+			udp.setPayload(ripPacket);
+
+			//set rip packet
+			ripPacket.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
+			ripPacket.setCommand(RIPv2.COMMAND_REQUEST);
+
+			// send the packet
+			this.sendPacket(ether, curIface);
+
+
+		}
+		ripResponseSender.start();
 	}
+
+
 
 	/**
 	 * Handle an Ethernet packet received on a specific interface.
@@ -191,6 +257,86 @@ public class Router extends Device
 
 		// Reset checksum now that TTL is decremented
 		ipPacket.resetChecksum();
+
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//                                                        RIP Code
+		if (ipPacket.getProtocol() == IPv4.PROTOCOL_UDP) {
+			UDP udpPacket = (UDP)ipPacket.getPayload();
+
+			// check for correct port (520)
+			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT) {
+				RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
+
+				// handle request command
+				if (ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {
+					// create all packet headers
+					Ethernet ether = new Ethernet();
+					IPv4 ip = new IPv4();
+					UDP udp = new UDP();
+					RIPv2 ripPacketNew = new RIPv2();
+					
+					// set ether headers
+					ether.setDestinationMACAddress(etherPacket.getSourceMACAddress()); // set to source mac of recieved packet. Ask Zach does this need to be done like it as above with Arp Cache
+					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+					ether.setEtherType(Ethernet.TYPE_IPv4);
+					ether.setPayload(ip);
+
+					// set ip headers
+					ip.setDestinationAddress(ipPacket.getSourceAddress());
+					ip.setSourceAddress(inIface.getIpAddress());
+					ip.setProtocol(IPv4.PROTOCOL_UDP);
+					ip.setTtl((byte)64);
+					ip.setPayload(udp);
+
+					//set udp headers
+					udp.setDestinationPort(UDP.RIP_PORT);
+					udp.setSourcePort(UDP.RIP_PORT);
+					udp.setPayload(ripPacket);
+
+					//set rip packet
+					ripPacketNew.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
+					ripPacketNew.setCommand(RIPv2.COMMAND_RESPONSE);
+
+					// send the packet
+					this.sendPacket(ether, inIface);
+
+				}
+				else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) {
+					// potentially update routeTable and ripTable based on new information from ripPacket
+					for (RIPv2Entry entry : ripPacket.getEntries()) {
+						// add to route table and rip table if doesn't exist
+						if (routeTable.lookup(entry.getAddress()) == null) { //should this be "entry.getAddress() & entry.getMask()"
+							routeTable.insert(entry.getAddress(), ipPacket.getSourceAddress(), entry.getSubnetMask(), inIface); // go over with zach
+							RIPv2Entry newRip = new RIPv2Entry(entry.getAddress(), entry.getSubnetMask(), entry.getMetric() + 1);
+							ripTable.put(newRip, System.currentTimeMillis());
+						}
+					}
+
+					// check recived packets rip to see if need to update any entries
+					for (RIPv2Entry potentiallyBetterRIPEntry : ripPacket.getEntries()) {
+						for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
+							if (potentiallyBetterRIPEntry.getAddress() == currentRipEntry.getAddress()
+							&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
+								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
+									// update current rip table and routing table
+									ripTable.remove(currentRipEntry);
+									ripTable.put(potentiallyBetterRIPEntry, System.currentTimeMillis());
+
+									routeTable.remove(currentRipEntry.getAddress(), currentRipEntry.getSubnetMask());
+									routeTable.insert(currentRipEntry.getAddress(), ipPacket.getSourceAddress(), currentRipEntry.getSubnetMask(), inIface);
+
+								}
+							}
+						}
+					}
+
+
+				}
+
+				return;
+			}
+		}
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		// Check if packet is destined for one of router's interfaces
 		for (Iface iface : this.interfaces.values())
@@ -484,5 +630,58 @@ public class Router extends Device
 		etherPacket.setDestinationMACAddress(arpEntry.getMac().toBytes());
 
 		this.sendPacket(etherPacket, outIface);
+	}
+
+	@Override
+	public void run() {
+		while (true)
+		{
+			// Run every 10 seconds
+			try 
+			{ Thread.sleep(10000); }
+			catch (InterruptedException e) 
+			{ break; }
+
+			// send out unsolocited rip responses to all neighbors
+			for (Iface curIface: interfaces.values()) {
+				// create all packet headers
+				Ethernet ether = new Ethernet();
+				IPv4 ip = new IPv4();
+				UDP udp = new UDP();
+				RIPv2 ripPacket = new RIPv2();
+				
+				// set ether headers
+				byte[] broadcast = {(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF}; //DestMac set to all ones
+				ether.setDestinationMACAddress(broadcast);
+				ether.setSourceMACAddress(curIface.getMacAddress().toBytes());
+				ether.setEtherType(Ethernet.TYPE_IPv4);
+				ether.setPayload(ip);
+
+				// set ip headers
+				ip.setDestinationAddress(-536870903); //int version of 224.0.0.9 Special multi cast for RIP
+				ip.setSourceAddress(curIface.getIpAddress());
+				ip.setProtocol(IPv4.PROTOCOL_UDP);
+				ip.setTtl((byte)64);
+				ip.setPayload(udp);
+
+				//set udp headers
+				udp.setDestinationPort(UDP.RIP_PORT);
+				udp.setSourcePort(UDP.RIP_PORT);
+				udp.setPayload(ripPacket);
+
+				//set rip packet
+				synchronized(routeTable){
+				ripPacket.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
+				}
+				ripPacket.setCommand(RIPv2.COMMAND_RESPONSE);
+
+				// send the packet
+				this.sendPacket(ether, curIface);
+
+			}
+			
+			
+		}
+		
 	}
 }
