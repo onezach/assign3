@@ -103,7 +103,8 @@ public class Router extends Device implements Runnable
 	}
 
 	public void startRip() {
-
+		synchronized(ripTable) {
+			synchronized(routeTable){
 		// initalize routeTable and ripTable
 		for (Iface curIFace: interfaces.values()) {
 			// create router entry
@@ -115,6 +116,8 @@ public class Router extends Device implements Runnable
 			RIPv2Entry entry = new RIPv2Entry(ip, mask, 1);
 			ripTable.put(entry, System.currentTimeMillis());
 		}
+	}
+}
 
 		System.out.println(routeTable);
 
@@ -464,6 +467,7 @@ public class Router extends Device implements Runnable
 				}
 				else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) {
 					synchronized(ripTable){
+						synchronized(routeTable){
 					// potentially update routeTable and ripTable based on new information from ripPacket
 					for (RIPv2Entry entry : ripPacket.getEntries()) {
 						// add to route table and rip table if doesn't exist
@@ -496,6 +500,7 @@ public class Router extends Device implements Runnable
 						}
 					}
 				}
+			}
 
 					System.out.println(routeTable);
 					printRip((ripTable));
@@ -745,12 +750,14 @@ class ThreadTimeOut implements Runnable {
 
 
 			synchronized(ripTable){
+				synchronized(routeTable){
 				for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
 					if (System.currentTimeMillis() - entry.getValue() > 30000) {
 						ripTable.remove(entry.getKey());
 						routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
 					}
 				}
+			}
 			}
 		}
 
