@@ -759,6 +759,9 @@ class ThreadTimeOut implements Runnable {
 							if (System.currentTimeMillis() - entry.getValue() > 30000) {
 								routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
 								iter.remove();
+								System.out.println("removed " + entry.getKey().getAddress());
+								System.out.println(routeTable);
+								
 							}
 					
 						// if (someCondition)
