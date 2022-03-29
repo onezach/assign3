@@ -103,61 +103,62 @@ public class Router extends Device implements Runnable
 	}
 
 	public void startRip() {
-		synchronized(ripTable){
-			// initalize routeTable and ripTable
-			for (Iface curIFace: interfaces.values()) {
-				// create router entry
-				int ip = curIFace.getIpAddress();
-				int mask = curIFace.getSubnetMask();
-				routeTable.insert(ip, 0, mask, curIFace);
 
-				// create ripTable entry
-				RIPv2Entry entry = new RIPv2Entry(ip, mask, 1);
-				ripTable.put(entry, System.currentTimeMillis());
-			}
+		// initalize routeTable and ripTable
+		for (Iface curIFace: interfaces.values()) {
+			// create router entry
+			int ip = curIFace.getIpAddress();
+			int mask = curIFace.getSubnetMask();
+			routeTable.insert(ip, 0, mask, curIFace);
 
-			System.out.println(routeTable);
-
-			// send out rip requests to all neighbors
-			for (Iface curIface: interfaces.values()) {
-				// create all packet headers
-				Ethernet ether = new Ethernet();
-				IPv4 ip = new IPv4();
-				UDP udp = new UDP();
-				RIPv2 ripPacket = new RIPv2();
-				
-				// set ether headers
-				byte[] broadcast = {(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF}; //DestMac set to all ones
-				ether.setDestinationMACAddress(broadcast);
-				ether.setSourceMACAddress(curIface.getMacAddress().toBytes());
-				ether.setEtherType(Ethernet.TYPE_IPv4);
-				ether.setPayload(ip);
-
-				// set ip headers
-				ip.setDestinationAddress(-536870903); //int version of 224.0.0.9 Special multi cast for RIP
-				ip.setSourceAddress(curIface.getIpAddress());
-				ip.setProtocol(IPv4.PROTOCOL_UDP);
-				ip.setTtl((byte)64);
-				ip.setPayload(udp);
-
-				//set udp headers
-				udp.setDestinationPort(UDP.RIP_PORT);
-				udp.setSourcePort(UDP.RIP_PORT);
-				udp.setPayload(ripPacket);
-
-				//set rip packet
-				ripPacket.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
-				ripPacket.setCommand(RIPv2.COMMAND_REQUEST);
-
-				// send the packet
-				this.sendPacket(ether, curIface);
-
-
-			}
-			ripResponseSender.start();
-			timeout.start();
+			// create ripTable entry
+			RIPv2Entry entry = new RIPv2Entry(ip, mask, 1);
+			ripTable.put(entry, System.currentTimeMillis());
 		}
+
+		System.out.println(routeTable);
+
+		// send out rip requests to all neighbors
+		for (Iface curIface: interfaces.values()) {
+			// create all packet headers
+			Ethernet ether = new Ethernet();
+			IPv4 ip = new IPv4();
+			UDP udp = new UDP();
+			RIPv2 ripPacket = new RIPv2();
+			
+			// set ether headers
+			byte[] broadcast = {(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF,(byte)0xFF}; //DestMac set to all ones
+			ether.setDestinationMACAddress(broadcast);
+			ether.setSourceMACAddress(curIface.getMacAddress().toBytes());
+			ether.setEtherType(Ethernet.TYPE_IPv4);
+			ether.setPayload(ip);
+
+			// set ip headers
+			ip.setDestinationAddress(-536870903); //int version of 224.0.0.9 Special multi cast for RIP
+			ip.setSourceAddress(curIface.getIpAddress());
+			ip.setProtocol(IPv4.PROTOCOL_UDP);
+			ip.setTtl((byte)64);
+			ip.setPayload(udp);
+
+			//set udp headers
+			udp.setDestinationPort(UDP.RIP_PORT);
+			udp.setSourcePort(UDP.RIP_PORT);
+			udp.setPayload(ripPacket);
+
+			//set rip packet
+			ripPacket.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
+			ripPacket.setCommand(RIPv2.COMMAND_REQUEST);
+
+			// send the packet
+			this.sendPacket(ether, curIface);
+
+
+		}
+		ripResponseSender.start();
+		timeout.start();
 	}
+
+
 
 	/**
 	 * Handle an Ethernet packet received on a specific interface.
@@ -412,7 +413,6 @@ public class Router extends Device implements Runnable
 				RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
 
 				// handle request command
-				synchronized(ripTable){
 				if (ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {
 					// create all packet headers
 					Ethernet ether = new Ethernet();
@@ -463,6 +463,7 @@ public class Router extends Device implements Runnable
 
 				}
 				else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) {
+					synchronized(ripTable){
 					// potentially update routeTable and ripTable based on new information from ripPacket
 					for (RIPv2Entry entry : ripPacket.getEntries()) {
 						// add to route table and rip table if doesn't exist
@@ -494,6 +495,7 @@ public class Router extends Device implements Runnable
 							}
 						}
 					}
+				}
 
 					System.out.println(routeTable);
 					printRip((ripTable));
@@ -502,7 +504,6 @@ public class Router extends Device implements Runnable
 				return;
 			}
 		}
-	}
 		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		// Do route lookup and forward
@@ -672,7 +673,6 @@ public class Router extends Device implements Runnable
 	public void run() {
 		while (true)
 		{
-			synchronized(ripTable) {
 			// Run every 10 seconds
 			try 
 			{ Thread.sleep(10000); }
@@ -719,7 +719,6 @@ public class Router extends Device implements Runnable
 			
 			
 		}
-	}
 		
 	}
 }
