@@ -472,7 +472,7 @@ public class Router extends Device implements Runnable
 					// potentially update routeTable and ripTable based on new information from ripPacket
 					for (RIPv2Entry entry : ripPacket.getEntries()) {
 						// add to route table and rip table if doesn't exist
-						if (routeTable.lookup(entry.getAddress()) == null) { //should this be "entry.getAddress() & entry.getMask()"
+						if (routeTable.lookup(entry.getAddress()) == null && entry.getAddress() != inIface.getIpAddress()) { //should this be "entry.getAddress() & entry.getMask()"
 							routeTable.insert(entry.getAddress(), ipPacket.getSourceAddress(), entry.getSubnetMask(), inIface); // go over with zach
 							RIPv2Entry newRip = new RIPv2Entry(entry.getAddress(), entry.getSubnetMask(), entry.getMetric() + 1);
 							ripTable.put(newRip, System.currentTimeMillis());
