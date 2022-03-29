@@ -145,7 +145,7 @@ public class Router extends Device implements Runnable
 
 
 		}
-		//ripResponseSender.start();
+		ripResponseSender.start();
 	}
 
 
