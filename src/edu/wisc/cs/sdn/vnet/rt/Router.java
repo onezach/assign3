@@ -107,6 +107,8 @@ public class Router extends Device implements Runnable
 			ripTable.put(entry, System.currentTimeMillis());
 		}
 
+		System.out.println(routeTable);
+
 		// send out rip requests to all neighbors
 		for (Iface curIface: interfaces.values()) {
 			// create all packet headers
@@ -143,7 +145,7 @@ public class Router extends Device implements Runnable
 
 
 		}
-		ripResponseSender.start();
+		//ripResponseSender.start();
 	}
 
 
