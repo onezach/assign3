@@ -3,6 +3,7 @@ package edu.wisc.cs.sdn.vnet.rt;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 
@@ -751,17 +752,26 @@ class ThreadTimeOut implements Runnable {
 
 			synchronized(ripTable){
 				synchronized(routeTable){
-				for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
-					if (System.currentTimeMillis() - entry.getValue() > 30000) {
-						ripTable.remove(entry.getKey());
-						routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+					Iterator<Map.Entry<RIPv2Entry, Long>> iter = ripTable.entrySet().iterator();
+					while (iter.hasNext()) {
+						Map.Entry<RIPv2Entry, Long> entry = iter.next();
+
+							if (System.currentTimeMillis() - entry.getValue() > 30000) {
+								routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+								iter.remove();
+							}
+					
+						// if (someCondition)
+						// 	iter.remove();
 					}
+				// for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
+				// 	if (System.currentTimeMillis() - entry.getValue() > 30000) {
+				// 		ripTable.remove(entry.getKey());
+				// 		routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+				// 	}
+				// }
 				}
 			}
-			}
 		}
-
-
 	}
-
 }
