@@ -260,86 +260,6 @@ public class Router extends Device implements Runnable
 		// Reset checksum now that TTL is decremented
 		ipPacket.resetChecksum();
 
-		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		//                                                        RIP Code
-		if (ipPacket.getProtocol() == IPv4.PROTOCOL_UDP) {
-			UDP udpPacket = (UDP)ipPacket.getPayload();
-
-			// check for correct port (520)
-			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT) {
-				RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
-
-				// handle request command
-				if (ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {
-					// create all packet headers
-					Ethernet ether = new Ethernet();
-					IPv4 ip = new IPv4();
-					UDP udp = new UDP();
-					RIPv2 ripPacketNew = new RIPv2();
-					
-					// set ether headers
-					ether.setDestinationMACAddress(etherPacket.getSourceMACAddress()); // set to source mac of recieved packet. Ask Zach does this need to be done like it as above with Arp Cache
-					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
-					ether.setEtherType(Ethernet.TYPE_IPv4);
-					ether.setPayload(ip);
-
-					// set ip headers
-					ip.setDestinationAddress(ipPacket.getSourceAddress());
-					ip.setSourceAddress(inIface.getIpAddress());
-					ip.setProtocol(IPv4.PROTOCOL_UDP);
-					ip.setTtl((byte)64);
-					ip.setPayload(udp);
-
-					//set udp headers
-					udp.setDestinationPort(UDP.RIP_PORT);
-					udp.setSourcePort(UDP.RIP_PORT);
-					udp.setPayload(ripPacket);
-
-					//set rip packet
-					ripPacketNew.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
-					ripPacketNew.setCommand(RIPv2.COMMAND_RESPONSE);
-
-					// send the packet
-					this.sendPacket(ether, inIface);
-
-				}
-				else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) {
-					// potentially update routeTable and ripTable based on new information from ripPacket
-					for (RIPv2Entry entry : ripPacket.getEntries()) {
-						// add to route table and rip table if doesn't exist
-						if (routeTable.lookup(entry.getAddress()) == null) { //should this be "entry.getAddress() & entry.getMask()"
-							routeTable.insert(entry.getAddress(), ipPacket.getSourceAddress(), entry.getSubnetMask(), inIface); // go over with zach
-							RIPv2Entry newRip = new RIPv2Entry(entry.getAddress(), entry.getSubnetMask(), entry.getMetric() + 1);
-							ripTable.put(newRip, System.currentTimeMillis());
-						}
-					}
-
-					// check recived packets rip to see if need to update any entries
-					for (RIPv2Entry potentiallyBetterRIPEntry : ripPacket.getEntries()) {
-						for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
-							if (potentiallyBetterRIPEntry.getAddress() == currentRipEntry.getAddress()
-							&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
-								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
-									// update current rip table and routing table
-									ripTable.remove(currentRipEntry);
-									ripTable.put(potentiallyBetterRIPEntry, System.currentTimeMillis());
-
-									routeTable.remove(currentRipEntry.getAddress(), currentRipEntry.getSubnetMask());
-									routeTable.insert(currentRipEntry.getAddress(), ipPacket.getSourceAddress(), currentRipEntry.getSubnetMask(), inIface);
-
-								}
-							}
-						}
-					}
-
-
-				}
-
-				return;
-			}
-		}
-		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 		// Check if packet is destined for one of router's interfaces
 		for (Iface iface : this.interfaces.values())
 		{
@@ -472,6 +392,86 @@ public class Router extends Device implements Runnable
 				return; 
 			}
 		}
+
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//                                                        RIP Code
+		if (ipPacket.getProtocol() == IPv4.PROTOCOL_UDP) {
+			UDP udpPacket = (UDP)ipPacket.getPayload();
+
+			// check for correct port (520)
+			if (udpPacket.getDestinationPort() == UDP.RIP_PORT && udpPacket.getSourcePort() == UDP.RIP_PORT) {
+				RIPv2 ripPacket = (RIPv2)udpPacket.getPayload();
+
+				// handle request command
+				if (ripPacket.getCommand() == RIPv2.COMMAND_REQUEST) {
+					// create all packet headers
+					Ethernet ether = new Ethernet();
+					IPv4 ip = new IPv4();
+					UDP udp = new UDP();
+					RIPv2 ripPacketNew = new RIPv2();
+					
+					// set ether headers
+					ether.setDestinationMACAddress(etherPacket.getSourceMACAddress()); // set to source mac of recieved packet. Ask Zach does this need to be done like it as above with Arp Cache
+					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
+					ether.setEtherType(Ethernet.TYPE_IPv4);
+					ether.setPayload(ip);
+
+					// set ip headers
+					ip.setDestinationAddress(ipPacket.getSourceAddress());
+					ip.setSourceAddress(inIface.getIpAddress());
+					ip.setProtocol(IPv4.PROTOCOL_UDP);
+					ip.setTtl((byte)64);
+					ip.setPayload(udp);
+
+					//set udp headers
+					udp.setDestinationPort(UDP.RIP_PORT);
+					udp.setSourcePort(UDP.RIP_PORT);
+					udp.setPayload(ripPacket);
+
+					//set rip packet
+					ripPacketNew.setEntries(new LinkedList<RIPv2Entry>(ripTable.keySet()));
+					ripPacketNew.setCommand(RIPv2.COMMAND_RESPONSE);
+
+					// send the packet
+					this.sendPacket(ether, inIface);
+
+				}
+				else if (ripPacket.getCommand() == RIPv2.COMMAND_RESPONSE) {
+					// potentially update routeTable and ripTable based on new information from ripPacket
+					for (RIPv2Entry entry : ripPacket.getEntries()) {
+						// add to route table and rip table if doesn't exist
+						if (routeTable.lookup(entry.getAddress()) == null) { //should this be "entry.getAddress() & entry.getMask()"
+							routeTable.insert(entry.getAddress(), ipPacket.getSourceAddress(), entry.getSubnetMask(), inIface); // go over with zach
+							RIPv2Entry newRip = new RIPv2Entry(entry.getAddress(), entry.getSubnetMask(), entry.getMetric() + 1);
+							ripTable.put(newRip, System.currentTimeMillis());
+						}
+					}
+
+					// check recived packets rip to see if need to update any entries
+					for (RIPv2Entry potentiallyBetterRIPEntry : ripPacket.getEntries()) {
+						for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
+							if (potentiallyBetterRIPEntry.getAddress() == currentRipEntry.getAddress()
+							&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
+								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
+									// update current rip table and routing table
+									ripTable.remove(currentRipEntry);
+									ripTable.put(potentiallyBetterRIPEntry, System.currentTimeMillis());
+
+									routeTable.remove(currentRipEntry.getAddress(), currentRipEntry.getSubnetMask());
+									routeTable.insert(currentRipEntry.getAddress(), ipPacket.getSourceAddress(), currentRipEntry.getSubnetMask(), inIface);
+
+								}
+							}
+						}
+					}
+
+
+				}
+
+				return;
+			}
+		}
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		// Do route lookup and forward
 		this.forwardIpPacket(etherPacket, inIface);
