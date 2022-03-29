@@ -412,23 +412,22 @@ public class Router extends Device implements Runnable
 					
 					// IPv4 ethPayload = (IPv4)etherPacket.getPayload();
 
-					int macSRC = ipPacket.getSourceAddress();
+					// int macSRC = ipPacket.getSourceAddress();
 
-					// Find matching route table entry 
-					RouteEntry prev = this.routeTable.lookup(macSRC);
+					// // Find matching route table entry 
+					// RouteEntry prev = this.routeTable.lookup(macSRC);
 					
-					int nextHop = prev.getGatewayAddress();
-					if (0 == nextHop)
-					{ nextHop = macSRC; }
+					// int nextHop = prev.getGatewayAddress();
+					// if (0 == nextHop)
+					// { nextHop = macSRC; }
 
-					// Set destination MAC address in Ethernet header
-					ArpEntry arpEntry = this.arpCache.lookup(nextHop);
-					ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
-
+					// // Set destination MAC address in Ethernet header
+					// ArpEntry arpEntry = this.arpCache.lookup(nextHop);
+					// ether.setDestinationMACAddress(arpEntry.getMac().toBytes());
 
 
 					// set ether headers
-					// ether.setDestinationMACAddress(etherPacket.getSourceMACAddress()); // set to source mac of recieved packet. Ask Zach does this need to be done like it as above with Arp Cache
+					ether.setDestinationMACAddress(etherPacket.getSourceMACAddress()); // set to source mac of recieved packet. Ask Zach does this need to be done like it as above with Arp Cache
 					ether.setSourceMACAddress(inIface.getMacAddress().toBytes());
 					ether.setEtherType(Ethernet.TYPE_IPv4);
 					ether.setPayload(ip);
