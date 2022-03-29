@@ -29,6 +29,8 @@ public class Router extends Device implements Runnable
 	/** thread to send unsolicited response messages */
 	private Thread ripResponseSender;
 
+	private Thread timeout;
+
 	/** RIP Table for the router */
 	private Map<RIPv2Entry, Long> ripTable;
 
@@ -45,6 +47,7 @@ public class Router extends Device implements Runnable
 		this.routeTable = new RouteTable();
 		this.ripResponseSender = new Thread(this);
 		this.ripTable = new HashMap<RIPv2Entry, Long>();
+		this.timeout = new Thread(new ThreadTimeOut(ripTable, routeTable));
 		this.arpCache = new ArpCache();
 
 	}
@@ -152,9 +155,8 @@ public class Router extends Device implements Runnable
 
 		}
 		ripResponseSender.start();
+		timeout.start();
 	}
-
-
 
 	/**
 	 * Handle an Ethernet packet received on a specific interface.
@@ -474,6 +476,9 @@ public class Router extends Device implements Runnable
 						for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
 							if (potentiallyBetterRIPEntry.getAddress() == currentRipEntry.getAddress()
 							&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
+								// update time
+								ripTable.replace(currentRipEntry, System.currentTimeMillis());
+
 								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
 									// update current rip table and routing table
 									ripTable.remove(currentRipEntry);
@@ -712,4 +717,40 @@ public class Router extends Device implements Runnable
 		}
 		
 	}
+}
+
+class ThreadTimeOut implements Runnable {
+
+	private Map<RIPv2Entry, Long> ripTable;
+	private RouteTable routeTable;
+
+	public ThreadTimeOut(Map<RIPv2Entry, Long> table, RouteTable routeTable) {
+		this.ripTable = table;
+		this.routeTable = routeTable;
+	}
+		
+
+	@Override
+	public void run() {
+		while (true)
+		{
+			try 
+				{ Thread.sleep(5000); }
+				catch (InterruptedException e) 
+				{ break; }
+
+
+			synchronized(ripTable){
+				for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
+					if (System.currentTimeMillis() - entry.getValue() > 30000) {
+						ripTable.remove(entry.getKey());
+						routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+					}
+				}
+			}
+		}
+
+
+	}
+
 }
