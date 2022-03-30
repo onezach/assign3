@@ -2,6 +2,7 @@ package edu.wisc.cs.sdn.vnet.rt;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -472,8 +473,8 @@ public class Router extends Device implements Runnable
 					// potentially update routeTable and ripTable based on new information from ripPacket
 					for (RIPv2Entry entry : ripPacket.getEntries()) {
 						// add to route table and rip table if doesn't exist
-						System.out.println("----------------entry" + entry.getAddress());
-						System.out.println("----------------iface" + inIface.getIpAddress());
+						// System.out.println("----------------entry" + entry.getAddress());
+						// System.out.println("----------------iface" + inIface.getIpAddress());
 						if (routeTable.lookup(entry.getAddress()) == null && entry.getAddress() != inIface.getIpAddress()) { //should this be "entry.getAddress() & entry.getMask()"
 							routeTable.insert(entry.getAddress(), ipPacket.getSourceAddress(), entry.getSubnetMask(), inIface); // go over with zach
 							RIPv2Entry newRip = new RIPv2Entry(entry.getAddress(), entry.getSubnetMask(), entry.getMetric() + 1);
@@ -481,25 +482,46 @@ public class Router extends Device implements Runnable
 						}
 					}
 
+					// Iterator<Map.Entry<RIPv2Entry, Long>> iter = ripTable.entrySet().iterator();
+					// while (iter.hasNext()) {
+					// 	Map.Entry<RIPv2Entry, Long> entry = iter.next();
+
+					// 	if (System.currentTimeMillis() - entry.getValue() > 30000) {
+					// 		routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+					// 		iter.remove();
+					// 		System.out.println("removed " + entry.getKey().getAddress());
+					// 		System.out.println(routeTable);
+							
+					// 	}
+					// }
+
 					// check recived packets rip to see if need to update any entries
 					for (RIPv2Entry potentiallyBetterRIPEntry : ripPacket.getEntries()) {
-						for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
+						// for (RIPv2Entry currentRipEntry : ripTable.keySet()) {
+						Iterator<RIPv2Entry> iter = ripTable.keySet().iterator();
+						ArrayList<RIPv2Entry> toAdd = new ArrayList<RIPv2Entry>();
+						while (iter.hasNext()) {
+							RIPv2Entry currentRipEntry = iter.next();
+
 							if (potentiallyBetterRIPEntry.getAddress() == currentRipEntry.getAddress()
-							&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
+								&& potentiallyBetterRIPEntry.getSubnetMask() == currentRipEntry.getSubnetMask()) {
 								// update time
 								ripTable.replace(currentRipEntry, System.currentTimeMillis());
-
 								if (potentiallyBetterRIPEntry.getMetric() < currentRipEntry.getMetric() - 1) {
 									// update current rip table and routing table
-									ripTable.remove(currentRipEntry);
+									
+									// ripTable.remove(currentRipEntry);
 									RIPv2Entry newRip = new RIPv2Entry(potentiallyBetterRIPEntry.getAddress(), potentiallyBetterRIPEntry.getSubnetMask(), potentiallyBetterRIPEntry.getMetric() + 1);
-									ripTable.put(newRip, System.currentTimeMillis());
-
+									// ripTable.put(newRip, System.currentTimeMillis());
+									toAdd.add(newRip);
 									routeTable.remove(currentRipEntry.getAddress(), currentRipEntry.getSubnetMask());
 									routeTable.insert(currentRipEntry.getAddress(), ipPacket.getSourceAddress(), currentRipEntry.getSubnetMask(), inIface);
-
+									iter.remove();
 								}
 							}
+						}
+						for (RIPv2Entry newRip : toAdd) {
+							ripTable.put(newRip, System.currentTimeMillis());
 						}
 					}
 				}
@@ -758,23 +780,14 @@ class ThreadTimeOut implements Runnable {
 					while (iter.hasNext()) {
 						Map.Entry<RIPv2Entry, Long> entry = iter.next();
 
-							if (System.currentTimeMillis() - entry.getValue() > 30000) {
-								routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
-								iter.remove();
-								System.out.println("removed " + entry.getKey().getAddress());
-								System.out.println(routeTable);
-								
-							}
-					
-						// if (someCondition)
-						// 	iter.remove();
+						if (System.currentTimeMillis() - entry.getValue() > 30000) {
+							routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
+							iter.remove();
+							System.out.println("removed " + entry.getKey().getAddress());
+							System.out.println(routeTable);
+							
+						}
 					}
-				// for (Map.Entry<RIPv2Entry, Long> entry : ripTable.entrySet()) {
-				// 	if (System.currentTimeMillis() - entry.getValue() > 30000) {
-				// 		ripTable.remove(entry.getKey());
-				// 		routeTable.remove(entry.getKey().getAddress(), entry.getKey().getSubnetMask());
-				// 	}
-				// }
 				}
 			}
 		}
